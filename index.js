@@ -14,6 +14,15 @@ const model = genAI.getGenerativeModel({ model: 'models/gemini-1.5-flash' });
 
 const upload = multer({ dest: 'uploads/'});
 
+function imageToGenerativePart(filePath, mimeType) {
+  return {
+    inlineData: {
+      data: Buffer.from(fs.readFileSync(filePath)).toString("base64"),
+      mimeType: "image/jpg"
+    },
+  };
+}
+
 const port = 3000;
 app.listen(port, () => {
   console.log(`Gemini API server is running at http://localhost:${port}`);
@@ -32,5 +41,16 @@ app.post('/generate-text', async (req, res) => {
 });
 
 app.post('/generate-from-image', upload.single('image'), async (req, res) => {
-  
-})
+  const prompt = req.body.prompt || 'Describe the image';
+  const image = imageToGenerativePart(req.file.path);
+
+  try {
+    const result = await model.generateContent([prompt, image]);
+    const response = await result.response;
+    res.json({ output: response.text() });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  } finally {
+    fs.unlinkSync(req.file.path)
+  }
+});
